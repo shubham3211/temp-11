@@ -1,16 +1,47 @@
-name: Label Stale PRs
+name: Add Badge to Stale PRs
 
 on:
   push:
     branches:
       - main
+
 jobs:
-  say-hello:
+  stale-pr-badge:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v2
 
-    - name: Print Hello World
-      run: echo "Hello, World!"
+      - name: Get list of open PRs
+        id: get_prs
+        uses: peter-evans/repository-dispatch@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          event-type: get-prs
+
+      - name: Filter PRs older than 60 days and add badge
+        uses: actions/github-script@v3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prList = await github.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100,
+            });
+
+            const now = new Date();
+            const sixtyDaysAgo = new Date(now.setDate(now.getDate() - 60));
+           
+            for (const pr of prList.data) {
+              const prCreatedAt = new Date(pr.created_at);
+              if (prCreatedAt < sixtyDaysAgo) {
+                await github.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  labels: ['stale'],
+                });
+              }
+            }
