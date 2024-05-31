@@ -1,0 +1,54 @@
+name: Label Stale PRs
+
+on:
+  workflow_dispatch:
+
+jobs:
+  label-stale-prs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+
+      - name: Install PyGitHub
+        run: pip install PyGithub
+
+      - name: Label stale PRs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          import os
+          from datetime import datetime, timedelta
+          from github import Github
+
+          # Get GitHub token from environment
+          token = os.getenv('GITHUB_TOKEN')
+
+          # Initialize GitHub client
+          g = Github(token)
+
+          # Get the repository
+          repo = g.get_repo(os.getenv('GITHUB_REPOSITORY'))
+
+          # Calculate the date 60 days ago from today
+          stale_date = datetime.now() - timedelta(days=60)
+
+          # Get open pull requests
+          open_prs = repo.get_pulls(state='open', sort='created', direction='asc')
+
+          # Iterate over the pull requests
+          for pr in open_prs:
+              # Check if the PR is older than 60 days
+              if pr.created_at < stale_date:
+                  # Add 'stale' label if not already added
+                  if 'stale' not in [label.name for label in pr.labels]:
+                      pr.add_to_labels('stale')
+                      print(f"Added 'stale' label to PR #{pr.number}")
+
+      - name: Complete
+        run: echo "Stale PR labeling completed."
